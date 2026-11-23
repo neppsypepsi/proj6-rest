@@ -1,150 +1,152 @@
 # Project 6: Brevet time calculator service
 
-Simple listing service from project 5 stored in MongoDB database.
+The ACP brevet calculator from Project 5 saves control times in MongoDB.
+This project adds a REST service that exposes those saved times as JSON or
+CSV, and a separate consumer website that uses the service.
 
-## What is in this repository
+**Author:** Nigel Epperson
+**Email:** epperson@uoregon.edu
 
-You have a minimal implementation of Docker compose in DockerRestAPI folder, using which you can create REST API-based services (as demonstrated in class). 
+---
 
-## Recap 
+## Running it
 
-You will reuse *your* code from project 5 (https://bitbucket.org/UOCIS322/proj5-mongo). Recall: you created the following functionalities.
+You need Docker. From the `DockerRestAPI` directory:
 
-1. Two buttons ("Submit") and ("Display") in the page where you have controle times.
-2. On clicking the Submit button, the control times were be entered into the database.
-3. On clicking the Display button, the entries from the database were be displayed in a new page.
-4. You also handled error cases appropriately.
+```bash
+docker compose up --build
+```
 
-## Functionality you will add
+This starts four containers:
 
-This project has following four parts. Change the values for host and port according to your machine, and use the web browser to check the results.
+| Service | URL on your machine | What it is |
+|---|---|---|
+| `brevets` | http://localhost:5001 | The Project 5 calculator. **Submit** saves to MongoDB, **Display** lists what is saved. |
+| `api` | http://localhost:5002 | The REST service (Flask-RESTful). |
+| `website` | http://localhost:5003 | The consumer program (PHP), in its own container. |
+| `db` | (internal only) | MongoDB 7. Data is kept in the `mongo-data` volume. |
 
-* You will design RESTful service to expose what is stored in MongoDB. Specifically, you'll use the boilerplate given in DockerRestAPI folder, and create the following three basic APIs:
-    * `http://<host:port>/listAll` should return all open and close times in the database
-    * `http://<host:port>/listOpenOnly` should return open times only
-    * `http://<host:port>/listCloseOnly` should return close times only
+Host ports start at 5001 because macOS often reserves 5000 for AirPlay
+Receiver. To stop and delete the saved data, run `docker compose down -v`.
 
-* You will also design two different representations: one in csv and one in json. For the above three basic APIs, JSON should be your default representation. 
-    * `http://<host:port>/listAll/csv` should return all open and close times in CSV format
-    * `http://<host:port>/listOpenOnly/csv` should return open times only in CSV format
-    * `http://<host:port>/listCloseOnly/csv` should return close times only in CSV format
+To try it out, open the calculator, enter some controls, click **Submit**,
+then use the API URLs below or the website.
 
-    * `http://<host:port>/listAll/json` should return all open and close times in JSON format
-    * `http://<host:port>/listOpenOnly/json` should return open times only in JSON format
-    * `http://<host:port>/listCloseOnly/json` should return close times only in JSON format
+---
 
-* You will also add a query parameter to get top "k" open and close times. For examples, see below.
+## REST API
 
-    * `http://<host:port>/listOpenOnly/csv?top=3` should return top 3 open times only (in ascending order) in CSV format 
-    * `http://<host:port>/listOpenOnly/json?top=5` should return top 5 open times only (in ascending order) in JSON format
-    * `http://<host:port>/listCloseOnly/csv?top=6` should return top 5 close times only (in ascending order) in CSV format
-    * `http://<host:port>/listCloseOnly/json?top=4` should return top 4 close times only (in ascending order) in JSON format
+All three lists return JSON by default. Add `/json` or `/csv` to pick the
+format.
 
-* You'll also design consumer programs (e.g., in jQuery) to use the service that you expose. "website" inside DockerRestAPI is an example of that. It is uses PHP. You're welcome to use either PHP or jQuery to consume your services. NOTE: your consumer program should be in a different container like example in DockerRestAPI.
+| URL | Returns |
+|---|---|
+| `/listAll` | open and close times |
+| `/listOpenOnly` | open times only |
+| `/listCloseOnly` | close times only |
+| `/listAll/csv`, `/listOpenOnly/csv`, `/listCloseOnly/csv` | the same, as CSV |
+| `/listAll/json`, `/listOpenOnly/json`, `/listCloseOnly/json` | the same, as JSON |
 
-## Data Samples
+Examples: http://localhost:5002/listAll, http://localhost:5002/listOpenOnly/csv?top=3
 
-The sample data files ([sample-data.json](data-samples/sample-data.json), [sample-data.csv](data-samples/sample-data.csv), and [sample-data-pivoted.csv](data-samples/sample-data-pivoted.csv)) provide a suggested JSON and CSV format that you could follow for your exports. 
+### `?top=k`
 
-1. JSON
+`?top=k` returns only the **k earliest times across all saved brevets, in
+ascending order**. `listOpenOnly` sorts by open time, `listCloseOnly` by close
+time, and `listAll` by open time. If k is larger than the number of controls,
+everything is returned. Controls stay grouped under their brevet, and a brevet
+with no remaining controls is left out.
+
+`top` must be a whole number of 1 or more. Anything else returns status 400
+with an error message.
+
+### JSON format
+
+This follows [data-samples/sample-data.json](data-samples/sample-data.json).
+Without `top`, brevets are listed in the order they were submitted (oldest
+first), and each brevet's controls are listed by distance.
+
 ```json
 {
-   "brevets":[
-      {
-         "distance":200,
-         "begin_date":"12/01/2021",
-         "begin_time":"18:06",
-         "controls":[
-            {
-               "km":0,
-               "mi":0,
-               "location":"begin",
-               "open":"12/01/2021 18:06",
-               "close":"12/01/2021 19:06"
-            },
-            {
-               "km":100,
-               "mi":62,
-               "location":null,
-               "open":"12/01/2021 21:02",
-               "close":"12/02/2021 00:46"
-            },
-            {
-               "km":150,
-               "mi":93,
-               "location":"second checkpoint",
-               "open":"12/01/2021 22:31",
-               "close":"12/02/2021 04:06"
-            },
-            {
-               "km":200,
-               "mi":124,
-               "location":"last checkpoint",
-               "open":"12/01/2021 23:59",
-               "close":"12/02/2021 07:36"
-            }
-         ]
-      },
-      {
-         "distance":1000,
-         "begin_date":"01/01/2022",
-         "begin_time":"00:00",
-         "controls":[
-            {
-               "km":0,
-               "mi":0,
-               "location":"begin",
-               "open":"01/01/2022 00:00",
-               "close":"01/01/2022 01:00"
-            },
-            {
-               "km":1000,
-               "mi":621,
-               "location":"finish line",
-               "open":"01/01/2022 09:05",
-               "close":"01/04/2022 03:00"
-            }
-         ]
-      }
-   ]
+  "brevets": [
+    {
+      "distance": 200,
+      "begin_date": "12/01/2021",
+      "begin_time": "18:06",
+      "controls": [
+        {"km": 0, "mi": 0, "location": "begin",
+         "open": "12/01/2021 18:06", "close": "12/01/2021 19:06"},
+        {"km": 100, "mi": 62, "location": null,
+         "open": "12/01/2021 21:02", "close": "12/02/2021 00:46"}
+      ]
+    }
+  ]
 }
 ```
 
-2. CSV
+- `mi` is rounded to a whole number, as in the sample.
+- A control with no location name has `"location": null`.
+- `listOpenOnly` leaves out `close`, and `listCloseOnly` leaves out `open`.
+
+### CSV format
+
+This follows [data-samples/sample-data-pivoted.csv](data-samples/sample-data-pivoted.csv):
+one row per control, with the brevet's columns repeated on each row. With one
+row per control, `?top=k` returns exactly k rows. `listOpenOnly` and
+`listCloseOnly` leave out the `close` or `open` column.
+
 ```csv
-brevets/distance,brevets/begin_date,brevets/begin_time,brevets/controls/0/km,brevets/controls/0/mi,brevets/controls/0/location,brevets/controls/0/open,brevets/controls/0/close,brevets/controls/1/km,brevets/controls/1/mi,brevets/controls/1/location,brevets/controls/1/open,brevets/controls/1/close,brevets/controls/2/km,brevets/controls/2/mi,brevets/controls/2/location,brevets/controls/2/open,brevets/controls/2/close,brevets/controls/3/km,brevets/controls/3/mi,brevets/controls/3/location,brevets/controls/3/open,brevets/controls/3/close
-200,12/01/2021,18:06,0,0,begin,12/01/2021 18:06,12/01/2021 19:06,100,62,,12/01/2021 21:02,12/02/2021 00:46,150,93,second checkpoint,12/01/2021 22:31,12/02/2021 04:06,200,124,last checkpoint,12/01/2021 23:59,12/02/2021 07:36
-1000,01/01/2022,00:00,0,0,begin,01/01/2022 00:00,01/01/2022 01:00,1000,621,finish line,01/01/2022 09:05,01/04/2022 03:00,,,,,,,,,,
+brevets/distance,brevets/begin_date,brevets/begin_time,brevets/controls/0/km,brevets/controls/0/mi,brevets/controls/0/location,brevets/controls/0/open,brevets/controls/0/close
+200,12/01/2021,18:06,0,0,begin,12/01/2021 18:06,12/01/2021 19:06
+200,12/01/2021,18:06,100,62,,12/01/2021 21:02,12/02/2021 00:46
 ```
 
-## Tasks
+### Errors
 
-You'll turn in your credentials.ini (including the keys `author` and `repo` under the section `[DEFAULT]`) using which we will get the following:
+| Status | When |
+|---|---|
+| 400 | `top` is not a whole number of 1 or more |
+| 404 | an unknown format, such as `/listAll/xml`, or an unknown path |
+| 503 | the database can't be reached |
 
-* The working application with three parts.
+Errors come back as JSON: `{"error": "..."}`.
 
-* Dockerfile
+---
 
-* docker-compose.yml
+## Consumer website
 
-## Grading Rubric
+http://localhost:5003 has a form to choose the list, the format (JSON or
+CSV), and an optional top k. The PHP page calls the API server side at
+`http://api/...` (the Compose service name), then shows the result as a table
+along with the raw response. If the API returns an error, the page shows the
+error message.
 
-* If your code works as expected: 100 points. This includes:
-    * Basic APIs work as expected. (15 points)
-    * Representations work as expected. (30 points)
-    * Query parameter-based APIs work as expected. (10 points)
-    * Consumer program works as expected. (10 points)
+---
 
-* For each non-working API, 5 points will be docked off. If none of them work,
-  you'll get 35 points assuming
-    * README is updated with your name and email ID. (5 points)
-    * The credentials.ini is submitted with the correct URL of your repo. (15 points)
-    * Dockerfile is present. 
-    * Docker-compose.yml works/builds without any errors. (15 points)
+## Running the tests
 
-* If README is not updated, 5 points will be docked off. 
+The tests use `mongomock`, so they don't need MongoDB or Docker running.
 
-* If the Docker-compose.yml doesn't build or is missing, 15 points will be
-  docked off. Same for Dockerfile as well.
+```bash
+cd DockerRestAPI/api && nosetests -v       # REST service
+cd DockerRestAPI/brevets && nosetests -v   # Project 5 calculator
+```
 
-* If credentials.ini is missing, 0 will be assigned.
+Install each folder's `requirements.txt` first, for example in a virtualenv.
+
+---
+
+## Project layout
+
+| Path | Purpose |
+|---|---|
+| `DockerRestAPI/docker-compose.yml` | Runs all four services together |
+| `DockerRestAPI/brevets/` | Project 5 calculator (Flask, `acp_times.py`, templates, tests) |
+| `DockerRestAPI/brevets/credentials.ini` | `author` and `repo` for grading |
+| `DockerRestAPI/api/api.py` | The REST service |
+| `DockerRestAPI/api/test_api.py` | Tests for every endpoint, format, `top`, and error |
+| `DockerRestAPI/api/Dockerfile` | API container build (Python 3.13) |
+| `DockerRestAPI/website/index.php` | Consumer program |
+| `data-samples/` | The suggested JSON and CSV formats |
+
+The calculator's own endpoints and time rules are unchanged from Project 5.

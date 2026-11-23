@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Saved Brevets</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet"
+   href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/calc.css') }}" />
+</head>
+<body>
+<div class="container">
+
+<h1>Saved Brevets</h1>
+<p><a href="{{ url_for('index') }}">&larr; Back to the calculator</a></p>
+
+{% if error %}
+  <div class="alert alert-danger" id="db-error">{{ error }}</div>
+{% elif not brevets %}
+  <div class="alert alert-info" id="empty">
+    Nothing has been saved yet. Enter controls on the calculator page and click Submit.
+  </div>
+{% endif %}
+
+{% for brevet in brevets %}
+  <div class="brevet">
+  <h3>{{ brevet.brevet_dist_km }} km brevet
+    <small>starts {{ brevet.start[:16] | replace("T", " ") }}</small></h3>
+  <table class="table table-condensed table-striped">
+    <tr>
+      <th>Miles</th>
+      <th>Km</th>
+      <th>Location</th>
+      <th>Open</th>
+      <th>Close</th>
+    </tr>
+    {% for c in brevet.controls %}
+    <tr class="saved-control">
+      <td>{{ c.miles }}</td>
+      <td>{{ "%g" | format(c.km) }}</td>
+      <td>{{ c.location }}</td>
+      <td>{{ c.open[:16] | replace("T", " ") }}</td>
+      <td>{{ c.close[:16] | replace("T", " ") }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+{% endfor %}
+
+</div>
+</body>
+</html>
